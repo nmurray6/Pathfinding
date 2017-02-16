@@ -21,7 +21,7 @@ public class CubeTest : MonoBehaviour {
 			Debug.Log (vert [n]);
 		}
 
-		int i = 0;
+		//int i = 0;
 		//while (i < norm.Length) {
 		//	if (i % 3 == 0)
 		//		Debug.Log ("NEW");
