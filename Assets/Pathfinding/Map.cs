@@ -7,63 +7,48 @@ public class Map : MonoBehaviour{
 	int X;
 	int Y;
 
+	public Camera camera;
+
 	NavigationGrid grid;
 	BlockNode[,,] MapData;
 
-	public int maxDepth = 10;
-	Vector3 vec;// = new Vector3 (1, 1, 1f);
+	public const int maxDepth = 30;
+	const int maxSize = 2000;
 
 	Vector3[] Vertices;
 	Vector2[] UV;
 	int[] Triangles;
-	Vector3 a;
 
+	GameObject obo;
 	void Start(){
-		grid = new NavigationGrid (10, 10);
-		createMap (10, 10);
+		grid = new NavigationGrid (30, 30);
+		createMap (30, 30);
 
-		a = Vector3.zero;
-	
-		vec = new Vector3 (1, 0, 0);
-		//rayCastMap (new Vector3 (1, .5f, 1), Vector3.zero, Vector3.zero);
+		obo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+
 	}
-	int c = 0;
+	float e = 0;
+	float d = 0;
 	void FixedUpdate(){
-		c++;
-		if(c > 500){
-			c = 0;
-			Vector3 dir = new Vector3 ();
-			dir.x = Random.value * 2 - 1;
-			dir.y = Random.value * 2 - 1;
-			dir.z = Random.value * 2 - 1;
+		Vector3 hit;
+		e += 0.004f;
+		d += 0.05f;
+		//Vector3 pos = new Vector3 (15 + 25 * Mathf.Sin (e), Mathf.Abs(d) + 25 * Mathf.Cos(e/2), 15 + 25 * Mathf.Cos (e));
+		Vector3 pos = new Vector3(5.5f+d,3.5f,-10);
 
-			Vector3 orig = new Vector3 (Random.value * MapData.GetLength (0), Random.value * MapData.GetLength (1), Random.value * MapData.GetLength (2));
+		if (d > 30)
+			d = -30;
+		obo.transform.position = pos;
 
-			rayCastMap (dir, orig, orig + new Vector3(0.5f, 0.5f, 0.5f));
-		}
-		/*	if (o > 1) {
-			o = 0;
-			/*if (a.y < maxDepth) {
-				removeCubeAtPos (a);
-				a.x++;
-				if (a.x >= grid.X) {
-					a.x = 0;
-					a.z++;
-					if (a.z >= grid.Z) {
-						a.z = 0;
-						a.y++;
-					}
-				}
+		//Vector3 rot = new Vector3 (-Mathf.Sin (e), -Mathf.Cos(e/2), -Mathf.Cos(e));
+		Vector3 rot = new Vector3(0,0,1);
 
-			int gx = Random.Range (grid.X/4, (int)(grid.X*0.75f));
-			int gz = Random.Range (0, grid.Z);
-			int gy = Random.Range (0, maxDepth);
+		raycast (pos, rot, out hit);
 
-			a = new Vector3 (gx, gy, gz);
-			removeCubeAtPos (a);
-			}
-		else
-			o++;*/
+		camera.transform.position = pos;
+		camera.transform.LookAt (hit);
+		obo.transform.LookAt (hit);
+		//MapData [0, 5, 0].intersect2 (pos, rot, out hit);
 	}
 
 	public void setGrid(NavigationGrid Grid){
@@ -87,6 +72,14 @@ public class Map : MonoBehaviour{
 				//	} else {
 				//		MapData [x, y, z].BlockType = 0;
 				//	}
+					if (x < grid.X / 5 || x > grid.X - grid.X / 5)
+						MapData [x, y, z].BlockType = 1;
+					else if (y < maxDepth / 5 || y > maxDepth - maxDepth / 5)
+						MapData [x, y, z].BlockType = 1;
+					else if (z < grid.Z / 5 || z > grid.Z - grid.Z / 5)
+						MapData [x, y, z].BlockType = 1;
+					else
+						MapData [x, y, z].BlockType = 0;
 				}
 			}
 		}
@@ -108,9 +101,7 @@ public class Map : MonoBehaviour{
 			}
 		}
 	}
-
-
-	int maxSize = 2000;
+		
 
 	void createObjectMesh(InformationHolder holder, int blockType, Vector3 position){
 		Mesh mesh = holder.cube.GetComponent<MeshFilter> ().mesh;
@@ -300,9 +291,9 @@ public class Map : MonoBehaviour{
 	}
 
 	void removeCubeAtPos(Vector3 position){
-		position.x = round (position.x);
-		position.y = round (position.y);
-		position.z = round (position.z);
+	//	position.x = round (position.x);
+	//	position.y = round (position.y);
+	//	position.z = round (position.z);
 
 		if (MapData [(int)position.x, (int)position.y, (int)position.z].BlockType != 0) {
 			int n = 0;
@@ -325,12 +316,23 @@ public class Map : MonoBehaviour{
 				block.infoHolder.blocks = null;
 				block.infoHolder = null;
 			} else {
-				//Destroy(block.infoHolder.cube);
 				block.infoHolder.blocks = null;
 			}
 			recreateMesh (block);
 		}
 	}
+
+	void refreshCube(BlockNode block){
+		if (block.BlockType != 0) {
+			for (int x = 0; x < block.infoHolder.blocks.Length; x++) {
+				block.infoHolder.blocks [x].used = false;
+			}
+
+			createObjectMesh (block.infoHolder, block.BlockType, block.coord);
+
+		}
+	}
+
 
 	void recreateMesh(BlockNode block){
 		int ctr = 0;
@@ -361,18 +363,201 @@ public class Map : MonoBehaviour{
 		return (a-(int)a >=0.5f) ? (int)a+1 : (int)a;
 	}
 
-	public BlockNode rayCastMap(Vector3 dir, Vector3 origin, Vector3 pos){
-		BlockNode target = new BlockNode();
-		Vector3 hit = new Vector3 ();
+	public BlockNode raycast(Vector3 origin, Vector3 direction, out Vector3 hit){
+		Vector3 pos = origin;
+		return raycast (origin, direction, pos, out hit);
+	}
 
-		MapData [(int)pos.x, (int)pos.y, (int)pos.z].intersect (origin, dir, ref hit);
+	public BlockNode raycast(Vector3 origin, Vector3 direction, Vector3 position, out Vector3 hit){
+		if (position != origin) {
+			if ((int)position.x >= 0 && (int)position.x < MapData.GetLength (0)
+				&& (int)position.y >= 0 && (int)position.y < MapData.GetLength (1)
+				&& (int)position.z >= 0 && (int)position.z < MapData.GetLength (2)) {
+				return rayCastMap (direction, origin, position, out hit);
+			} else
+				return raycastFromOutOfMap (origin, direction, out hit);
+		} else {
+			if ((int)origin.x >= 0 && (int)origin.x < MapData.GetLength (0)
+			   && (int)origin.y >= 0 && (int)origin.y < MapData.GetLength (1)
+			   && (int)origin.z >= 0 && (int)origin.z < MapData.GetLength (2)) {
+				return rayCastMap (direction, origin, position, out hit);
+			} else
+				return raycastFromOutOfMap (origin, direction, out hit);
+		}
+	}
+	public BlockNode rayCastMap(Vector3 dir, Vector3 origin, Vector3 position, out Vector3 hit){
+		hit = origin;
+		Vector3 pos = position;
+		if (!HandleHit (position)) {
+			int c = 0;
+			pos = MapData [(int)pos.x, (int)pos.y, (int)pos.z].intersect2 (origin, dir, out hit);
+			while (pos.x >= 0 && pos.x < MapData.GetLength (0)
+			      && pos.y >= 0 && pos.y < MapData.GetLength (1)
+			      && pos.z >= 0 && pos.z < MapData.GetLength (2)
+			      && !HandleHit (pos)) {
+				pos = MapData [(int)pos.x, (int)pos.y, (int)pos.z].intersect2 (hit, dir, out hit);
 
+				c++;
+				if (c > 70) {
+					break;
+				}
+			}
+		}
+			
+		return null;
+	}
 
-		return target;
+	public bool HandleHit(Vector3 pos){
+		if (pos.x >= 0 && pos.x < MapData.GetLength (0)
+			&& pos.y >= 0 && pos.y < MapData.GetLength (1)
+			&& pos.z >= 0 && pos.z < MapData.GetLength (2)
+			&& MapData [(int)pos.x, (int)pos.y, (int)pos.z].BlockType != 0) {
+
+			MapData[(int)pos.x, (int)pos.y, (int)pos.z].health -= 1;
+			if (MapData [(int)pos.x, (int)pos.y, (int)pos.z].health <= 0)
+				removeCubeAtPos (pos);
+
+			return true;
+		}
+		return false;
 	}
 
 
+
+	//Returns the position of the block node that is hit
+/*	public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vector3 hit){
+		hit = new Vector3 (-1,-1,-1);
+		Vector3 position = Vector3.zero;
+		float x0t = (-origin.x) / direction.x;
+		float x1t = (grid.X - origin.x) / direction.x;
+		float y0t = (-origin.y) / direction.y;
+		float y1t = (maxDepth - origin.y) / direction.y;
+		float z0t = (-origin.z) / direction.z;
+		float z1t = (grid.Z - origin.z) / direction.z;
+
+		Vector3 X0AxisHit = x0t * direction + origin;
+		Vector3 X1AxisHit = x1t * direction + origin;
+		Vector3 Y0AxisHit = y0t * direction + origin;
+		Vector3 Y1AxisHit = y1t * direction + origin;
+		Vector3 Z0AxisHit = z0t * direction + origin;
+		Vector3 Z1AxisHit = z1t * direction + origin;
+
+		if (direction.x < 0
+			&& X1AxisHit.x <= grid.X + 0.01f && X1AxisHit.y <= maxDepth + 0.01f && X1AxisHit.z <= grid.Z + 0.01f
+			&& X1AxisHit.x >= -0.01f && X1AxisHit.y >= -0.01f && X1AxisHit.z >= -0.01f) {
+			hit = X1AxisHit;
+			position.x--;
+
+		} else if (direction.x >= 0
+			&& X0AxisHit.x <= grid.X + 0.01f && X0AxisHit.y <= maxDepth + 0.01f && X0AxisHit.z <= grid.Z + 0.01f
+			&& X0AxisHit.x >= -0.01f && X0AxisHit.y >= -0.01f && X0AxisHit.z >= -0.01f) {
+			hit = X0AxisHit;
+
+		} if (direction.y < 0
+			&& Y1AxisHit.x <= grid.X + 0.01f && Y1AxisHit.y <= maxDepth + 0.01f && Y1AxisHit.z <= grid.Z + 0.01f
+			&& Y1AxisHit.x >= -0.01f && Y1AxisHit.y - 0.01f >= -0.01f && Y1AxisHit.z >= -0.01f) {
+			hit = Y1AxisHit;
+			position.y--;
+
+		} else if (direction.y >= 0
+			&& Y0AxisHit.x <= grid.X + 0.01f && Y0AxisHit.y <= maxDepth + 0.01f && Y0AxisHit.z <= grid.Z + 0.01f
+			&& Y0AxisHit.x >= -0.01f && Y0AxisHit.y >= -0.01f && Y0AxisHit.z >= -0.01f) {
+			hit = Y0AxisHit;
+
+		} if (direction.z < 0
+		      && Z1AxisHit.x <= grid.X + 0.01f && Z1AxisHit.y <= maxDepth + 0.01f && Z1AxisHit.z <= grid.Z + 0.01f
+		      && Z1AxisHit.x >= -0.01f && Z1AxisHit.y >= -0.01f && Z1AxisHit.z >= -0.01f) {
+			hit = Z1AxisHit;
+			position.z--;
+
+		} else if (direction.z >= 0
+		           && Z0AxisHit.x <= grid.X + 0.01f && Z0AxisHit.y <= maxDepth + 0.01f && Z0AxisHit.z <= grid.Z + 0.01f
+		           && Z0AxisHit.x >= -0.01f && Z0AxisHit.y >= -0.01f && Z0AxisHit.z >= -0.01f) {
+			hit = Z0AxisHit;
+		}
+
+		//Debug.DrawLine (origin, hit);
+
+		position += hit;
+		Debug.Log (position);
+		if (hit.x == -1 && hit.y == -1 && hit.z == -1)
+			return null;
+		else
+			return rayCastMap (direction, hit, position, out hit);
+	}*/
+
+public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vector3 hit){
+		hit = new Vector3 (-1, -1, -1);
+
+		float x0t = (-origin.x) / direction.x;
+		float x1t = (grid.X - origin.x) / direction.x;
+		float y0t = (-origin.y) / direction.y;
+		float y1t = (maxDepth - origin.y) / direction.y;
+		float z0t = (-origin.z) / direction.z;
+		float z1t = (grid.Z - origin.z) / direction.z;
+
+
+		Vector3 dir = direction.normalized;
+		short dirVal = 0; 
+		/*
+		0 = xt
+		1 = yt
+		2 = zt
+		*/
+
+		float xt, yt, zt;
+
+		if (dir.x < 0)
+			xt = x1t;
+		else
+			xt = x0t;
+
+		if (dir.y < 0)
+			yt = y1t;
+		else
+			yt = y0t;
+
+		if (dir.z < 0)
+			zt = z1t;
+		else
+			zt = z0t;
+
+
+		Vector3 position = Vector3.zero;
+		if (Mathf.Abs (xt) > Mathf.Abs (yt)) {
+			xt = yt;
+
+			if (Mathf.Abs (xt) > Mathf.Abs (zt)) {
+				xt = zt;
+				if(Mathf.Sign(dir.z) < 0)
+					position.z -= 1;
+			} else {
+				if(Mathf.Sign(dir.y) < 0)
+					position.y -= 1;
+			}
+		} else if (Mathf.Abs (xt) > Mathf.Abs (zt)) {
+			xt = zt;
+			if(Mathf.Sign(dir.z) < 0)
+				position.z -= 1;
+		} else {
+			if(Mathf.Sign(dir.x) < 0)
+			position.x -= 1;
+		}
+
+		hit = xt * direction + origin;
+
+
+		position += hit;
+
+		Color color = new Color (position.x / 30, position.y/30, position.z/30);
+		Debug.DrawLine (origin, hit, color);
+		//Debug.DrawLine(origin, hit);
+
+		return rayCastMap(direction, hit, position, out hit);
+	}
 }
+
+
 
 public class BlockNode{
 	public short BlockType = 1;
@@ -385,6 +570,8 @@ public class BlockNode{
 	public Vector3[] right;
 	public Vector3[] front;
 	public Vector3[] back;
+
+	public float health = 1;
 
 	public bool used = false;
 
@@ -439,7 +626,10 @@ public class BlockNode{
 		}
 	}
 
-	public bool intersect(Vector3 origin, Vector3 direction, ref Vector3 hit){
+	//Returns the position of the block node that is hit
+	public Vector3 intersect(Vector3 origin, Vector3 direction, out Vector3 hit){
+		hit = new Vector3 ();
+		Vector3 position = coord;
 		float x0t = (bottom[2].x - origin.x) / direction.x;
 		float x1t = (top[0].x - origin.x) / direction.x;
 		float y0t = (bottom[2].y - origin.y) / direction.y;
@@ -454,26 +644,149 @@ public class BlockNode{
 		Vector3 Z0AxisHit = z0t * direction + origin;
 		Vector3 Z1AxisHit = z1t * direction + origin;
 
-		if (X1AxisHit.x <= top [0].x && X1AxisHit.y <= top [0].y && X1AxisHit.z <= top [0].z
-		    && X1AxisHit.x >= bottom [2].x && X1AxisHit.y >= bottom [2].y && X1AxisHit.z >= bottom [2].z) {
-			if (direction.x < 0)
-				hit = X0AxisHit;
-			else
-				hit = X1AxisHit;
-		} else if (Y1AxisHit.x <= top [0].x && Y1AxisHit.y <= top [0].y && Y1AxisHit.z <= top [0].z
-		           && Y1AxisHit.x >= bottom [2].x && Y1AxisHit.y >= bottom [2].y && Y1AxisHit.z >= bottom [2].z) {
-			if (direction.y < 0)
-				hit = Y0AxisHit;
-			else
-				hit = Y1AxisHit;
-		} else if (Z1AxisHit.x <= top [0].x && Z1AxisHit.y <= top [0].y && Z1AxisHit.z <= top [0].z
-		         && Z1AxisHit.x >= bottom [2].x && Z1AxisHit.y >= bottom [2].y && Z1AxisHit.z >= bottom [2].z) {
-			if (direction.z < 0)
-				hit = Z0AxisHit;
-			else
-				hit = Z1AxisHit;
+
+		if (direction.x >= 0
+			&& X1AxisHit.x <= top [0].x + 0.01f && X1AxisHit.y <= top [0].y + 0.01f && X1AxisHit.z <= top [0].z + 0.01f
+			&& X1AxisHit.x >= bottom [2].x - 0.01f && X1AxisHit.y >= bottom [2].y - 0.01f && X1AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(X1AxisHit);
+			position.x++;
+
+		} else if (direction.x < 0
+			&& X0AxisHit.x <= top [0].x + 0.01f && X0AxisHit.y <= top [0].y + 0.01f && X0AxisHit.z <= top [0].z + 0.01f
+			&& X0AxisHit.x >= bottom [2].x - 0.01f && X0AxisHit.y >= bottom [2].y - 0.01f && X0AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(X0AxisHit);
+			position.x--;
+
+		} if (direction.y >= 0
+			&& Y1AxisHit.x <= top [0].x + 0.01f && Y1AxisHit.y <= top [0].y + 0.01f && Y1AxisHit.z <= top [0].z + 0.01f
+			&& Y1AxisHit.x >= bottom [2].x - 0.01f && Y1AxisHit.y - 0.01f >= bottom [2].y - 0.01f && Y1AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(Y1AxisHit);
+			position.y++;
+
+		} else if (direction.y < 0
+			&& Y0AxisHit.x <= top [0].x + 0.01f && Y0AxisHit.y <= top [0].y + 0.01f && Y0AxisHit.z <= top [0].z + 0.01f
+			&& Y0AxisHit.x >= bottom [2].x - 0.01f && Y0AxisHit.y >= bottom [2].y - 0.01f && Y0AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(Y0AxisHit);
+			position.y--;
+
+		} if (direction.z >= 0
+			&& Z1AxisHit.x <= top [0].x + 0.01f && Z1AxisHit.y <= top [0].y + 0.01f && Z1AxisHit.z <= top [0].z + 0.01f
+			&& Z1AxisHit.x >= bottom [2].x - 0.01f && Z1AxisHit.y >= bottom [2].y - 0.01f && Z1AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(Z1AxisHit);
+			position.z++;
+
+		} else if (direction.z < 0
+			&& Z0AxisHit.x <= top [0].x + 0.01f && Z0AxisHit.y <= top [0].y + 0.01f && Z0AxisHit.z <= top [0].z + 0.01f
+			&& Z0AxisHit.x >= bottom [2].x - 0.01f && Z0AxisHit.y >= bottom [2].y - 0.01f && Z0AxisHit.z >= bottom [2].z - 0.01f) {
+			hit = VecRound(Z0AxisHit);
+			position.z--;
+		} 
+
+		Color color = new Color (position.x / 30, 0.5f, position.z/30);
+		//Debug.DrawLine (origin, hit, color);
+		//Debug.DrawLine(origin, hit);
+		if (hit == Vector3.zero) {
+			Debug.Log ("broke (" + origin.x + ", " + origin.y + ", " + origin.z + ")  (" + direction.x + ", " + direction.y + ", " + direction.z + ")");
+			Debug.Log(X0AxisHit);
+			Debug.Log (X1AxisHit);
+			Debug.Log (Y0AxisHit);
+			Debug.Log (Y1AxisHit);
+			Debug.Log (Z0AxisHit);
+			Debug.Log (Z1AxisHit);
+			Debug.Log (direction.z >= 0);
+				Debug.Log(Z1AxisHit.x <= top [0].x + 0.01f);
+			Debug.Log (Z1AxisHit.y <= top [0].y + 0.01f);
+			Debug.Log (Z1AxisHit.z <= top [0].z + 0.01f);
+			Debug.Log (Z1AxisHit.x >= bottom [2].x - 0.01f);
+			Debug.Log (Z1AxisHit.y >= bottom [2].y - 0.01f);
+			Debug.Log(Z1AxisHit.z >= bottom [2].z - 0.01f);
+			Debug.Log (bottom [2]);
 		}
-		return true;
+		return position;
+	}
+
+	//TEST INTERSECT
+	public Vector3 intersect2(Vector3 origin, Vector3 direction, out Vector3 hit){
+		hit = new Vector3 ();
+		Vector3 position = coord;
+		float x0t = (bottom[2].x - origin.x) / direction.x;
+		float x1t = (top[0].x - origin.x) / direction.x;
+		float y0t = (bottom[2].y - origin.y) / direction.y;
+		float y1t = (top[0].y - origin.y) / direction.y;
+		float z0t = (bottom[2].z - origin.z) / direction.z;
+		float z1t = (top[0].z - origin.z) / direction.z;
+
+
+		Vector3 dir = direction.normalized;
+		short dirVal = 0; 
+		/*
+		0 = xt
+		1 = yt
+		2 = zt
+		*/
+
+		float xt, yt, zt;
+
+		if (dir.x >= 0)
+			xt = x1t;
+		else
+			xt = x0t;
+
+		if (dir.y >= 0)
+			yt = y1t;
+		else
+			yt = y0t;
+
+		if (dir.z >= 0)
+			zt = z1t;
+		else
+			zt = z0t;
+
+		if (Mathf.Abs (xt) > Mathf.Abs (yt)) {
+			xt = yt;
+
+			if (Mathf.Abs (xt) > Mathf.Abs (zt)) {
+				xt = zt;
+				position.z += Mathf.Sign (dir.z);
+			} else {
+				position.y += Mathf.Sign (dir.y);
+			}
+		} else if (Mathf.Abs (xt) > Mathf.Abs (zt)) {
+			xt = zt;
+			position.z += Mathf.Sign (dir.z);
+		} else {
+			position.x += Mathf.Sign (dir.x);
+		}
+
+		hit = xt * direction + origin;
+
+
+		Color color = new Color (position.x / 30, position.y/30, position.z/30);
+		Debug.DrawLine (origin, hit, color);
+		//Debug.DrawLine(origin, hit);
+
+		return position;
+	}
+	//END TEST INTERSECT
+
+
+	private Vector3 VecRound(Vector3 vec){
+		if (vec.x < bottom [2].x && vec.x >= bottom [2].x - 0.01f)
+			vec.x = bottom [2].x;
+		else if (vec.x > top [0].x && vec.x <= top [0].x + 0.01f)
+			vec.x = top [0].x;
+
+		if (vec.y < bottom [2].y && vec.y >= bottom [2].y - 0.01f)
+			vec.y = bottom [2].y;
+		else if (vec.y > top [0].y && vec.y <= top [0].y + 0.01f)
+			vec.y = top [0].y;
+
+		if (vec.z < bottom [2].z && vec.z >= bottom [2].z - 0.01f)
+			vec.z = bottom [2].z;
+		else if (vec.z > top [0].z && vec.z <= top [0].z + 0.01f)
+			vec.x = top [0].z;
+
+		return vec;
 	}
 }
 
