@@ -13,42 +13,91 @@ public class Map : MonoBehaviour{
 	BlockNode[,,] MapData;
 
 	public const int maxDepth = 30;
-	const int maxSize = 2000;
+	int maxSize = 100;
+	private int TotalUnusedError = 0;
 
 	Vector3[] Vertices;
 	Vector2[] UV;
 	int[] Triangles;
 
 	GameObject obo;
+	GameObject obo1;
+	GameObject obo2;
+	GameObject obo3;
+
+	int useless = 0;
 	void Start(){
 		grid = new NavigationGrid (30, 30);
-		createMap (30, 30);
+		TotalUnusedError = grid.X * grid.Z * maxDepth;
+		createMap (grid.X, grid.Z);
+		RemoveAirFromUnused ();
 
 		obo = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		obo1 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		obo2 = GameObject.CreatePrimitive(PrimitiveType.Cube);
+		obo3 = GameObject.CreatePrimitive(PrimitiveType.Cube);
 
 	}
 	float e = 0;
 	float d = 0;
+	public float tim = 0.02f;
 	void FixedUpdate(){
+		Time.fixedDeltaTime = tim;
 		Vector3 hit;
 		e += 0.004f;
 		d += 0.05f;
-		//Vector3 pos = new Vector3 (15 + 25 * Mathf.Sin (e), Mathf.Abs(d) + 25 * Mathf.Cos(e/2), 15 + 25 * Mathf.Cos (e));
-		Vector3 pos = new Vector3(5.5f+d,3.5f,-10);
+		//Vector3 pos = new Vector3 (grid.X/2 + grid.X*1.5f * Mathf.Sin (e), Mathf.Cos(e/2), grid.Z/2 + grid.Z*1.5f * Mathf.Cos (e));
+		Vector3 pos = new Vector3(15+25*Mathf.Sin(e), Mathf.Abs(d)+25*Mathf.Cos(e/2), 15+25*Mathf.Cos(e));
+		Vector3 pos1 = new Vector3(15+25*Mathf.Sin(e+3), Mathf.Abs(d+3)+25*Mathf.Cos((e+3)/2), 15+25*Mathf.Cos(e+3));
+		Vector3 pos2 = new Vector3(15+25*Mathf.Sin(e+7), Mathf.Abs(d+7)+25*Mathf.Cos((e+7)/2), 15+25*Mathf.Cos(e+7));
+		Vector3 pos3 = new Vector3(15+25*Mathf.Sin(e+23), Mathf.Abs(d+23)+25*Mathf.Cos((e+23)/2), 15+25*Mathf.Cos(e+23));
 
-		if (d > 30)
-			d = -30;
+
+		//Vector3 pos = new Vector3(5.5f+d,3.5f,-10);
+
+		if (d > maxDepth)
+			d = -maxDepth;
 		obo.transform.position = pos;
+		obo1.transform.position = pos1;
+		obo2.transform.position = pos2;
+		obo3.transform.position = pos3;
 
-		//Vector3 rot = new Vector3 (-Mathf.Sin (e), -Mathf.Cos(e/2), -Mathf.Cos(e));
-		Vector3 rot = new Vector3(0,0,1);
+		Vector3 rot = new Vector3 (-Mathf.Sin (e), -Mathf.Cos(e/2), -Mathf.Cos(e));
+		Vector3 rot1 = new Vector3 (-Mathf.Sin (e+3), -Mathf.Cos((e+3)/2), -Mathf.Cos(e+3));
+		Vector3 rot2 = new Vector3 (-Mathf.Sin (e+7), -Mathf.Cos((e+7)/2), -Mathf.Cos(e+7));
+		Vector3 rot3 = new Vector3 (-Mathf.Sin (e+23), -Mathf.Cos((e+23)/2), -Mathf.Cos(e+23));
+		//Vector3 rot = new Vector3(0,0,1);
 
-		raycast (pos, rot, out hit);
+		obo.transform.LookAt (pos + rot);
+		obo1.transform.LookAt (pos1 + rot1);
+		obo2.transform.LookAt (pos2 + rot2);
+		obo3.transform.LookAt (pos3 + rot3);
+		camera.transform.LookAt (pos + rot);
+		int temp = useless % 4;
+		switch (temp) {
+		case 1:
+			raycast (pos1, rot1, out hit);
+			break;
+		case 2:
+			raycast (pos2, rot2, out hit);
+			break;
+		case 3:
+			raycast (pos3, rot3, out hit);
+			break;
+		case 0:
+			raycast (pos, rot, out hit);
+			break;
+		}
+		useless++;
 
 		camera.transform.position = pos;
-		camera.transform.LookAt (hit);
-		obo.transform.LookAt (hit);
+		//camera.transform.LookAt (hit);
+		//obo.transform.LookAt (hit);
 		//MapData [0, 5, 0].intersect2 (pos, rot, out hit);
+		//Debug.Log(TotalUnusedError);
+		CheckForUnused ();
+		if (TotalUnusedError < 0)
+			TotalUnusedError = 0;
 	}
 
 	public void setGrid(NavigationGrid Grid){
@@ -67,12 +116,13 @@ public class Map : MonoBehaviour{
 			for(int y = 0; y < maxDepth; y++){
 				for(int z = 0; z < grid.Z; z++){
 					MapData [x, y, z] = new BlockNode (new Vector3 (x, y, z));
-				//	if (Random.value > .5f) {
+					MapData [x, y, z].BlockType = 1;
+					//	if (Random.value > .5f) {
 				//		MapData [x, y, z].BlockType = 1;
 				//	} else {
 				//		MapData [x, y, z].BlockType = 0;
 				//	}
-					if (x < grid.X / 5 || x > grid.X - grid.X / 5)
+			/*		if (x < grid.X / 5 || x > grid.X - grid.X / 5)
 						MapData [x, y, z].BlockType = 1;
 					else if (y < maxDepth / 5 || y > maxDepth - maxDepth / 5)
 						MapData [x, y, z].BlockType = 1;
@@ -80,6 +130,23 @@ public class Map : MonoBehaviour{
 						MapData [x, y, z].BlockType = 1;
 					else
 						MapData [x, y, z].BlockType = 0;
+			*/	}
+			}
+		}
+	}
+
+	private void CheckForUnused(){
+		if (TotalUnusedError > 0) {
+			createMapAssets ();
+		}
+	}
+
+	private void RemoveAirFromUnused(){
+		for (int x = 0; x < grid.X; x++) {
+			for (int y = 0; y < maxDepth; y++) {
+				for (int z = 0; z < grid.Z; z++) {
+					if (MapData [x, y, z].BlockType == 0)
+						TotalUnusedError--;
 				}
 			}
 		}
@@ -100,6 +167,8 @@ public class Map : MonoBehaviour{
 				}
 			}
 		}
+
+
 	}
 		
 
@@ -137,6 +206,8 @@ public class Map : MonoBehaviour{
 		mesh.triangles = triAct;
 		mesh.normals = normsAct;
 
+		TotalUnusedError -= count+1;
+
 		if (count < maxSize) {
 			holder.blocks = new BlockNode[count + 1];
 			for (x = 0; x <= count; x++) {
@@ -152,6 +223,10 @@ public class Map : MonoBehaviour{
 			MapData [x, y, z].used = true;
 			blockHolder [count] = MapData [x, y, z];
 			MapData [x, y, z].infoHolder = info;
+			Debug.DrawLine (MapData [x, y, z].bottom [2], MapData [x, y, z].top [2], Color.green);
+			Debug.DrawLine (MapData [x, y, z].bottom [0], MapData [x, y, z].top [0], Color.green);
+			Debug.DrawLine (MapData [x, y, z].bottom [1], MapData [x, y, z].top [1], Color.green);
+			Debug.DrawLine (MapData [x, y, z].bottom [3], MapData [x, y, z].top [3], Color.green);
 			//first use recursion to find all the cubes to add
 			if (count < maxSize && x + 1 < MapData.GetLength(0)
 				&& MapData [x+1, y, z].BlockType == blockType && !MapData [x+1, y, z].used) {
@@ -289,74 +364,163 @@ public class Map : MonoBehaviour{
 			}
 		}
 	}
+		
 
 	void removeCubeAtPos(Vector3 position){
 	//	position.x = round (position.x);
 	//	position.y = round (position.y);
 	//	position.z = round (position.z);
-
-		if (MapData [(int)position.x, (int)position.y, (int)position.z].BlockType != 0) {
+		//Debug.Log(checkContains(position));
+	/*	if (MapData [(int)position.x, (int)position.y, (int)position.z].BlockType != 0 && MapData [(int)position.x, (int)position.y, (int)position.z].infoHolder.blocks != null) {
 			int n = 0;
-			while (MapData [(int)position.x, (int)position.y, (int)position.z] != MapData [(int)position.x, (int)position.y, (int)position.z].infoHolder.blocks [n])
+			while (MapData [(int)position.x, (int)position.y, (int)position.z] != MapData [(int)position.x, (int)position.y, (int)position.z].infoHolder.blocks [n]) {
 				n++;
-
+			}
 			removeCube (MapData [(int)position.x, (int)position.y, (int)position.z].infoHolder.blocks [n], n);
-		}
+		}*/
+		removeCube (MapData [(int)position.x, (int)position.y, (int)position.z], 0);
 	}
 
 	void removeCube(BlockNode block, int arrIndex){
 		if (block.BlockType != 0) {
 			block.BlockType = 0;
-			for (int x = 0; x < block.infoHolder.blocks.Length; x++) {
-				block.infoHolder.blocks [x].used = false;
-			}
+			TotalUnusedError--;
+			block.used = false;
+		//	for (int x = 0; x < block.infoHolder.blocks.Length; x++) {
+		//		block.infoHolder.blocks [x].used = false;
+		//	}
 
 			if (block.infoHolder.blocks.Length == 1) {
 				Destroy (block.infoHolder.cube);
+				block.infoHolder.cube = null;
 				block.infoHolder.blocks = null;
 				block.infoHolder = null;
+				refreshBlockAreaAfterRemoval (block);
 			} else {
-				block.infoHolder.blocks = null;
+				block.infoHolder = null;
+				refreshBlockAreaAfterRemoval (block);
 			}
-			recreateMesh (block);
 		}
-	}
-
-	void refreshCube(BlockNode block){
-		if (block.BlockType != 0) {
-			for (int x = 0; x < block.infoHolder.blocks.Length; x++) {
-				block.infoHolder.blocks [x].used = false;
-			}
-
-			createObjectMesh (block.infoHolder, block.BlockType, block.coord);
-
-		}
-	}
-
-
-	void recreateMesh(BlockNode block){
-		int ctr = 0;
-		Vector3 position = block.coord;
-		int maxX = position.x + 1 < grid.X ? (int)position.x + 1 : (int)position.x;
-		int maxY = position.y + 1 < maxDepth ? (int)position.y + 1 : (int)position.y;
-		int maxZ = position.z + 1 < grid.Z ? (int)position.z + 1 : (int)position.z;
-		for(int y = position.y - 1 >= 0 ? (int)position.y - 1 : (int)position.y; y <= maxY; y++){
-			for(int x = position.x - 1 >= 0 ? (int)position.x - 1 : (int)position.x; x <= maxX; x++){
-				for(int z = position.z - 1 >= 0 ? (int)position.z - 1 : (int)position.z; z <= maxZ; z++){
-					if (ctr != 0 && MapData [x, y, z].BlockType != 0 && !MapData [x, y, z].used) {
-						InformationHolder holder = new InformationHolder ();
-						holder.cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-						holder.cube.transform.position = Vector3.zero;
-						createObjectMesh(holder, MapData[x,y,z].BlockType, MapData[x,y,z].coord);
-						Destroy(holder.cube.GetComponent<BoxCollider> ());
-
-					} else if (MapData [x, y, z].BlockType != 0 && !MapData [x, y, z].used) {
-						createObjectMesh (block.infoHolder, MapData [x, y, z].BlockType, MapData [x, y, z].coord);
-						ctr++;
+			
+		//testing
+		for (int x = 0; x < grid.X; x++) {
+			for (int y = 0; y < maxDepth; y++) {
+				for (int z = 0; z < grid.Z; z++) {
+					if (MapData [x, y, z].BlockType != 0 && !MapData [x, y, z].used) {
+						Debug.DrawLine (MapData [x, y, z].bottom [2], MapData [x, y, z].top [0], Color.red);
 					}
 				}
 			}
 		}
+		//end test
+	}
+
+	bool contains(GameObject trg, GameObject[] arr){
+		for (int i = 0; i < arr.Length; i++) {
+			if (trg != null && ReferenceEquals(trg, arr[i])) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void refreshBlockAreaAfterRemoval(BlockNode block){
+		GameObject[] arr = new GameObject[27];
+		BlockNode[] blocks = new BlockNode[27];
+
+		int minX = ((int)block.coord.x == 0) ? 0 : (int)block.coord.x - 1;
+		int minY = ((int)block.coord.y == 0) ? 0 : (int)block.coord.y - 1;
+		int minZ = ((int)block.coord.z == 0) ? 0 : (int)block.coord.z - 1;
+
+		int maxX = ((int)block.coord.x == MapData.GetLength(0) - 1) ? MapData.GetLength(0) - 1 : (int)block.coord.x + 1;
+		int maxY = ((int)block.coord.y == MapData.GetLength(1) - 1) ? MapData.GetLength(1) - 1 : (int)block.coord.y + 1;
+		int maxZ = ((int)block.coord.z == MapData.GetLength(2) - 1) ? MapData.GetLength(2) - 1 : (int)block.coord.z + 1;
+
+		int i = 0;
+		for (int x = minX; x <= maxX; x++) {
+			for (int y = minY; y <= maxY; y++) {
+				for (int z = minZ; z <= maxZ; z++) {
+					if (MapData [x, y, z].infoHolder != null) {
+						if (!contains (MapData [x, y, z].infoHolder.cube, arr)) {
+							arr [i] = MapData [x, y, z].infoHolder.cube;
+							blocks [i] = MapData [x, y, z];
+							i++;
+						}
+					}
+				}
+			}
+		}
+
+		for (int n = 0; n < i; n++) {
+			if(blocks[n].BlockType != 0)
+				refreshBlockMesh (blocks[n]);
+		}
+
+		i = 0;
+		arr = new GameObject[27];
+		for (int x = minX; x <= maxX; x++) {
+			for (int y = minY; y <= maxY; y++) {
+				for (int z = minZ; z <= maxZ; z++) {
+					if (!((int)block.coord.x == x && (int)block.coord.y == y && (int)block.coord.z == z)
+						&& MapData [x, y, z].BlockType != 0 && !MapData [x, y, z].used) {
+
+						InformationHolder holder = new InformationHolder ();
+						holder.cube = GameObject.CreatePrimitive (PrimitiveType.Cube);
+						holder.cube.transform.position = Vector3.zero;
+						createObjectMesh (holder, MapData [x, y, z].BlockType, MapData [x, y, z].coord);
+						Destroy (holder.cube.GetComponent<BoxCollider> ());
+					}
+				}
+			}
+		}
+
+		for (int n = 0; n < i; n++) {
+			if (blocks [n].BlockType != 0) {
+				InformationHolder holder = new InformationHolder ();
+				holder.cube = GameObject.CreatePrimitive (PrimitiveType.Cube);
+				holder.cube.transform.position = Vector3.zero;
+				createObjectMesh (holder, blocks[n].BlockType, blocks[n].coord);
+				Destroy (holder.cube.GetComponent<BoxCollider> ());
+			}
+		}
+
+	/*	int n = 0;
+		GameObject[] arra = new GameObject[20000];
+		for(int y = 0; y < maxDepth; y++){
+			for(int x = 0; x < grid.X; x++){
+				for(int z = 0; z < grid.Z; z++){
+				//	if (!contains (MapData [x, y, z].infoHolder.cube, arra)) {
+				//		arra [n] = MapData [x, y, z].infoHolder.cube;
+				//		n++;
+				//	}
+					if (MapData [x, y, z].infoHolder.cube == null)
+						n++;//Debug.Log (MapData [x, y, z].coord);
+				}
+			}
+		}
+		Debug.Log (n);*/
+	}
+
+	void refreshBlock (BlockNode block){
+		int x = (int)block.coord.x;
+		int y = (int)block.coord.y;
+		int z = (int)block.coord.z;
+		if (block.BlockType != 0) {
+			InformationHolder holder = new InformationHolder ();
+			holder.cube = GameObject.CreatePrimitive (PrimitiveType.Cube);
+			holder.cube.transform.position = Vector3.zero;
+			createObjectMesh (holder, MapData [x, y, z].BlockType, MapData [x, y, z].coord);
+			Destroy (holder.cube.GetComponent<BoxCollider> ());
+		} 
+	}
+
+
+	void refreshBlockMesh(BlockNode block){
+		for (int i = 0; i < block.infoHolder.blocks.Length; i++) {
+			block.infoHolder.blocks [i].used = false;
+			TotalUnusedError++;
+		}
+		createObjectMesh (block.infoHolder, block.BlockType, block.coord);
 	}
 
 	private int round(float a){
@@ -425,7 +589,7 @@ public class Map : MonoBehaviour{
 
 
 	//Returns the position of the block node that is hit
-/*	public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vector3 hit){
+	public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vector3 hit){
 		hit = new Vector3 (-1,-1,-1);
 		Vector3 position = Vector3.zero;
 		float x0t = (-origin.x) / direction.x;
@@ -479,13 +643,14 @@ public class Map : MonoBehaviour{
 		//Debug.DrawLine (origin, hit);
 
 		position += hit;
-		Debug.Log (position);
+		//Debug.Log (position);
+		Debug.DrawLine(origin, hit);
 		if (hit.x == -1 && hit.y == -1 && hit.z == -1)
 			return null;
 		else
 			return rayCastMap (direction, hit, position, out hit);
-	}*/
-
+	}
+	/*
 public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vector3 hit){
 		hit = new Vector3 (-1, -1, -1);
 
@@ -498,12 +663,6 @@ public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vect
 
 
 		Vector3 dir = direction.normalized;
-		short dirVal = 0; 
-		/*
-		0 = xt
-		1 = yt
-		2 = zt
-		*/
 
 		float xt, yt, zt;
 
@@ -522,6 +681,13 @@ public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vect
 		else
 			zt = z0t;
 
+
+		if (inBounds (xt * direction + origin))
+			hit = xt * direction + origin;
+		else if (inBounds (yt * direction + origin))
+			hit = yt * direction + origin;
+		else if (inBounds (zt * direction + origin))
+			hit = zt * direction + origin;
 
 		Vector3 position = Vector3.zero;
 		if (Mathf.Abs (xt) > Mathf.Abs (yt)) {
@@ -544,16 +710,29 @@ public BlockNode raycastFromOutOfMap(Vector3 origin, Vector3 direction, out Vect
 			position.x -= 1;
 		}
 
-		hit = xt * direction + origin;
-
+		//hit = xt * direction + origin;
 
 		position += hit;
+		Debug.Log (position);
 
 		Color color = new Color (position.x / 30, position.y/30, position.z/30);
 		Debug.DrawLine (origin, hit, color);
 		//Debug.DrawLine(origin, hit);
 
+
 		return rayCastMap(direction, hit, position, out hit);
+	}*/
+
+	private bool inBounds(Vector3 pos){
+		if (pos.x >= 0
+		    && pos.y >= 0
+		    && pos.z >= 0
+		    && pos.x <= grid.X
+			&& pos.y <= maxDepth
+		    && pos.z <= grid.Z) {
+			return true;
+		} else
+			return false;
 	}
 }
 
@@ -685,23 +864,6 @@ public class BlockNode{
 		Color color = new Color (position.x / 30, 0.5f, position.z/30);
 		//Debug.DrawLine (origin, hit, color);
 		//Debug.DrawLine(origin, hit);
-		if (hit == Vector3.zero) {
-			Debug.Log ("broke (" + origin.x + ", " + origin.y + ", " + origin.z + ")  (" + direction.x + ", " + direction.y + ", " + direction.z + ")");
-			Debug.Log(X0AxisHit);
-			Debug.Log (X1AxisHit);
-			Debug.Log (Y0AxisHit);
-			Debug.Log (Y1AxisHit);
-			Debug.Log (Z0AxisHit);
-			Debug.Log (Z1AxisHit);
-			Debug.Log (direction.z >= 0);
-				Debug.Log(Z1AxisHit.x <= top [0].x + 0.01f);
-			Debug.Log (Z1AxisHit.y <= top [0].y + 0.01f);
-			Debug.Log (Z1AxisHit.z <= top [0].z + 0.01f);
-			Debug.Log (Z1AxisHit.x >= bottom [2].x - 0.01f);
-			Debug.Log (Z1AxisHit.y >= bottom [2].y - 0.01f);
-			Debug.Log(Z1AxisHit.z >= bottom [2].z - 0.01f);
-			Debug.Log (bottom [2]);
-		}
 		return position;
 	}
 
